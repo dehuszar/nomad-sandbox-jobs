@@ -5,7 +5,7 @@ job "hello-world" {
   parameterized {
     payload       = "forbidden"
     meta_required = ["start_time"]
-    meta_optional = ["message"]
+    meta_optional = ["subject"]
   }
 
   group "hellos" {
@@ -24,14 +24,33 @@ job "hello-world" {
     task "runner" {
       driver = "docker"
 
-      artifact {
-        source      = "https://github.com/dehuszar/nomad-sandbox-jobs/load-balancing-test/hello-world.js"
+      template {
+        data = <<EOF
+const startTime = process.argv[2];
+const subject = process.argv[3];
+
+function hello ( startTime, subject ) {
+  const now = new Date();
+  const started = new Date(startTime);
+  const runtime = (now - started)/1000;
+  const subOrDefault = subject === "" ? "World" : subject;
+  console.log(`Hello ${subOrDefault}.  This message took ${runtime}s`);
+}
+
+hello(startTime, subject);
+      EOF
+
         destination = "local/hello-world.js"
       }
 
       config {
         image   = "node:lts-alpine"
-        command = "node hello-world.js"
+        command = "node"
+        args = [
+          "local/hello-world.js",
+          env["NOMAD_META_start_time"],
+          env["NOMAD_META_subject"]
+        ]
       }
     }
   }
